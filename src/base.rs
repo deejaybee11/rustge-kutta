@@ -1,6 +1,13 @@
 use ndarray::{ArrayD, Array2, Array1, arr1, arr2};
 use num_complex::Complex64;
 
+// Enable conversion from f64 to Array1<f64>
+impl From<f64> for Array1<f64> {
+    fn from(x: f64) -> Self {
+        arr1(&[x])
+    }
+}
+
 fn check_arguments(f: impl Fn(f64, &[Complex64]) -> Vec<Complex64>, y: &[f64], support_complex: bool) {
 
     if y0.ndim() == 1{
@@ -39,7 +46,7 @@ struct ODESolver {
     nlu: i32,
 }
 
-impl ODESolver {
+pub trait ODESolver {
     fn new<F>(
         fun: F,
         t0: f64,
@@ -152,5 +159,96 @@ impl ODESolver {
     }
 
     fn dense_output(&self) -> Array1<Complex64> {
-        if self
+        if self.t_old == None{
+            panic!("Dense output is available after a successful step was made.")
+        }
+        if self.n == 0 || self.t == self.t_old {
+            return ConstantDenseOutput(self.t_old,self.t,self.y)
+        }
+        else {
+            return self.dense_output_impl()
+        }
+    }
+
+    fn step_impl(&self) {
+        panic!("Not implemented")
+    }
+    fn dense_output_impl(&self) {
+        panic!("Not implemented")
+    }
+}
+
+pub trait Output {
+    fn call<T>(&self, t: T) -> Array1<Complex64> 
+    where 
+        T: Into<Array1<f64>>
+    {
+        let t_arr = t.into();
+        if t_arr.ndim() > 1 {
+            panic!("`t` must be a float or a 1-D array");
+        }
+        
+        self._call_impl(t_arr)
+    }
+
+    fn call_impl(&self, t: T) {
+        panic!("Not implemented")
+    }
+}
+
+struct DenseOutput {
+    t_old: f64,
+    t: f64,
+    t_min: f64,
+    t_max: f64,
+}
+
+impl DenseOutput {
+    fn new<F>(t_old: f64, t: f64) -> Self {
+
+        DenseOutput {
+        t_old: t_old,
+        t: t,
+        t_min: min(t, t_old),
+        t_max: max(t, t_old),
+        }
+    }
+}
+
+impl Output for DenseOutput {
+
+}
+
+struct ConstantDenseOutput {
+    t_old: f64,
+    t: f64,
+    t_min: f64,
+    t_max: f64,
+}
+
+impl ConstantDenseOutput {
+    fn new<F>(t_old: f64, t: f64, value: f64) -> Self {
+
+        ConstantDenseOutput {
+        t_old: t_old,
+        t: t,
+        t_min: min(t, t_old),
+        t_max: max(t, t_old),
+        value: f64,
+        }
+    }
+}
+
+impl Output for ConstantDenseOutput {
+
+    fn call_impl(&self, t: T) {
+        if t.ndim() == 0 {
+            return self.value
+        }
+        else {
+            let ret = Array2::zeros((self.value.raw_dim()[0],t.raw_dim()[0]));
+            ret[:] = self.value[:,None]
+            return ret
+        }
+    }
 }

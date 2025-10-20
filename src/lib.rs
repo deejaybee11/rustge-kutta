@@ -1,4 +1,5 @@
 using ndarray::{ArrayD, Array2, Array1, arr1, arr2};
+mod base
 
 let const SAFETY = 0.9;
 let const MIN_FACTOR = 0.2;
@@ -49,7 +50,7 @@ pub struct RungeKutta {
     direction: f64,
 }
 
-impl RungeKutta {
+impl ODESolver for RungeKutta {
     pub fn new<F>(
         fun: F,
         t0: f64, 
@@ -67,6 +68,15 @@ impl RungeKutta {
         let max_step = validate_max_step(max_step);
         let y_old = None;
         let rtol, atol = validate_tolerances(rtol, atol, n);
-
-
-    }}
+        if first_step == None {
+            let h_abs = select_initial_step(self.fun, self.t, self.y, t_bound, max_step, self.f, self.direction,
+                self.error_estimator_order, self.rtol, self.atol);
+        }
+        else {
+            let h_abs = validate_first_step(first_step, t0, t_bound);
+        }
+        let K = Array2::zeros(self.n_stages+1,self.n);
+        let error_exponent = -1.0 / (self.error_estimator_order+1); 
+        let h_previous = None;
+    }
+}
