@@ -1,9 +1,9 @@
 using ndarray::{ArrayD, Array2, Array1, arr1, arr2};
 mod base
 
-let const SAFETY = 0.9;
-let const MIN_FACTOR = 0.2;
-let const MAX_FACTOR = 10;
+const SAFETY = 0.9;
+const MIN_FACTOR = 0.2;
+const MAX_FACTOR = 10;
 
 fn rk_step(f: impl Fn(f64, &[f64]) -> Vec<f64>, t: f64, y: &[f64], h: f64, A: Array2, B: Array1, C: Array1, mut K: Array2) -> (Vec<f64>, Vec<f64>) {
 
@@ -11,6 +11,7 @@ fn rk_step(f: impl Fn(f64, &[f64]) -> Vec<f64>, t: f64, y: &[f64], h: f64, A: Ar
     for s, (a,c) in enumerate(zip(A[1:], C[1:])) {
         dy = K[:s].transpose().dot(&a[:s]) * h;
         K[s] = f(t + c * h, y + dy);
+    }
     
     let y_new = y + h * K[:-1].transpose().dot(&B);
     let f_new = f(t + h, &y_new);
