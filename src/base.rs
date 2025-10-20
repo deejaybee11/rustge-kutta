@@ -53,6 +53,47 @@ impl ODESolver {
         let support_complex = true; // Assume we want to support complex numbers
         let (fun_wrapped, y0_complex) = check_arguments(fun, &y0, support_complex);
 
+        if vectorized {
+            // Vectorized case
+            let fun_single = Box::new(move |t: f64, y: &Array1<f64>| -> Array1<f64> {
+                // Convert y to a 2D array with one column
+                let y_col = y.clone().insert_axis(Axis(1));
+                // Call vectorized function and flatten result
+                fun(t, &y_col).to_owned()
+            });
+            
+            let fun_vectorized = Box::new(move |t, y| fun(t, y));
+            
+            (fun_single, fun_vectorized)
+        } else {
+            // Non-vectorized case
+            let fun_single = Box::new(fun);
+            
+            let fun_vectorized = Box::new(move |t: f64, y: &Array2<f64>| -> Array2<f64> {
+                let n_rows = y.nrows();
+                let n_cols = y.ncols();
+                let mut f = Array2::zeros((n_rows, n_cols));
+                
+                // Apply function column by column
+                for i in 0..n_cols {
+                    let yi = y.column(i).to_owned();
+                    let fi = fun(t, &yi);
+                    f.column_mut(i).assign(&fi);
+                }
+                f
+            });
+            
+            (fun_single, fun_vectorized)
+        }
+
+        fn fun<F>(t: f64, y: &Array1<Complex64>) -> Array1<Complex64>
+        where
+            F: Fn(f64, &Array1<Complex64>) -> Array1<Complex64>,
+        {
+            self.nfev += 1;
+            fun_single(t, y)
+        }
+        
         let direction = if t_bound >= t0 { 1 } else { -1 };
 
         ODESolver {
@@ -75,4 +116,41 @@ impl ODESolver {
             nlu: 0,
         }
     }
+
+    fn step_size(&self) -> f64 {
+        if self.t_old is None {
+            return None;
+        } else {
+            return (self.t - self.t_old).abs();
+        }
+    }
+
+    fn step(&mut self) -> String{
+        let mut message = None;
+        let mut succecss = None;
+        if self.status != "running" {
+            panic!("Cannot call step() when the solver is not running.");
+        }
+        if self.n == 0 || self.t == self.t_bound {
+            self.t_old = self.t;
+            self.t = self.t_bound;
+            message = None;
+            self.status = "finished".to_string();
+        } else {
+            t = self.t;
+            success, message = self.step_impl();
+            if !success {
+                self.status = "failed".to_string();
+            } else {
+                self.t_old = self.t;
+                if self.direction * (self.t - self.t_bound) >= 0.0 {
+                    self.status = "finished".to_string();
+                }
+            }
+        }
+        return message
+    }
+
+    fn dense_output(&self) -> Array1<Complex64> {
+        if self
 }
